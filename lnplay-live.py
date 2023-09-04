@@ -66,9 +66,14 @@ def lnplaylive_createorder(plugin, node_count, hours, description):
         bolt12_label = str(uuid.uuid4())
         bolt12_invoice = "TODO"
 
+        # get calculate an estimated expiration datetime for the vm environment.
+        expiration_date = calculate_expiration_date(hours)
+        date_string = expiration_date.strftime('%Y-%m-%d %H:%M:%S')
+
         createorder_response = {
             "node_count": node_count,
             "hours": hours,
+            "expires_after": date_string,
             "bolt11_invoice_id": bolt11_guid_str,
             "bolt11_invoice": bolt11_invoice["bolt11"],
             "bolt12_invoice_id": bolt12_label,
@@ -143,10 +148,21 @@ class WhatTheHellException(Exception):
 @plugin.subscribe("invoice_payment")
 def on_payment(plugin, invoice_payment, **kwargs):
     try:
-        value = "test"
+        expiration_date = calculate_expiration_date(number_of_hours)
+        expiration_date_utc = expiration_date.strftime('%Y-%m-%d %H:%M:%S')
 
+            "expiration_date": expiration_date_utc,
     except RpcError as e:
         printout("Payment error: {}".format(e))
 
+
+def calculate_expiration_date(hours):
+
+    # Get the current date and time
+    current_datetime = datetime.now()
+    time_delta = timedelta(hours=hours)
+    expired_after_datetime = current_datetime + time_delta
+
+    return expired_after_datetime
 
 plugin.run()  # Run our plugin
