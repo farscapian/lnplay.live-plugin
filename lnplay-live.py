@@ -27,39 +27,47 @@ def init(options, configuration, plugin, **kwargs):
 
 
 @plugin.method("lnplaylive-createorder")
-def lnplaylive_createorder(plugin, node_count, hours, description):
+def lnplaylive_createorder(plugin, node_count, hours, order_details_json):
     '''Returns a BOLT11 invoice for the given node count and time.'''
     try:
         # first let's ensure the values that they passed in are appropriate.
         rate_to_charge = None
 
+        # ensure node_count is an int
+        if not isinstance(node_count, int):
+            raise Exception("Error: node_count MUST be a positive integer.")
+
         if node_count == 8:
-            rate_to_charge = 20000
+            rate_to_charge = 200000
         elif node_count == 16:
-            rate_to_charge = 22000
+            rate_to_charge = 220000
         elif node_count == 32:
-            rate_to_charge = 24000
+            rate_to_charge = 240000
         elif node_count == 64:
-            rate_to_charge = 26000
+            rate_to_charge = 260000
         else:
             raise InvalidCLNCountError("Invalid product. Valid node counts are 8, 16, 32, and 64.")
 
+        # ensure hours is an int
         if not isinstance(hours, int):
             raise Exception("Error: hours MUST be a positive integer.")
 
+        # ensure 'hours' is within acceptable limits
         if hours < 3:
             raise HoursTooLowException("The minimum hours you can set is 3.")
         elif hours > 504:
             raise HoursTooHighException("The maximum hours you can set is 504.")
 
-        # calcuate the amount to charge in the invoice (msats)
-        amount_to_charge = rate_to_charge * node_count
+        # calcuate the amount to charge in the invoice (msats) (msats per node hour)
+        amount_to_charge = rate_to_charge * node_count * hours
 
-        ## we just need a guid to for cross referencing invoices.
+        # we just need a guid to for cross referencing invoices. Order details for paid invoices are also stored in the
+        # database under the label/guid bolt11_guid_str.
         bolt11_guid = uuid.uuid4()
         bolt11_guid_str = str(bolt11_guid)
         
         # generate the invoice
+        description = f"lnplay.live - {node_count} nodes for {hours} hours."
         bolt11_invoice = plugin.rpc.invoice(amount_to_charge, bolt11_guid_str, description, 300)
 
         # create a BOLT12 offer.
@@ -111,10 +119,24 @@ def lnplaylive_invoicestatus(plugin, payment_type, invoice_id):
         if matching_invoice is None:
             raise InvoiceNotFoundError("BOLT11 invoice not found. Wrong invoice_id?")
 
+        invoice_status = matching_invoice["status"]
+
+        deployment_details = None
+
+        connection_strings = ["constr0", "constr1", "constr2", "..."]
+
+        if invoice_status == "paid":
+            deployment_details = {
+                "lnplay_git_head": "TODO",
+                "lnlive_plugin_version": lnlive_plugin_version,
+                "connection_strings": connection_strings
+            }
+
         invoicestatus_response = {
             "payment_type": payment_type,
             "invoice_id": invoice_id,
-            "invoice_status": matching_invoice["status"]
+            "invoice_status": invoice_status,
+            "deployment_details": deployment_details
         }
 
         json_data = json.dumps(invoicestatus_response)
