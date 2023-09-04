@@ -23,7 +23,7 @@ plugin = Plugin()
 
 @plugin.init()  # Decorator to define a callback once the `init` method call has successfully completed
 def init(options, configuration, plugin, **kwargs):
-    plugin.log("lnplay.live - plugin initialized10")
+    plugin.log("lnplay.live - plugin initialized")
 
 
 @plugin.method("lnplaylive-createorder")
@@ -47,9 +47,10 @@ def lnplaylive_createorder(plugin, node_count, hours, description):
             "node_count": node_count,
             "hours": hours,
             "bolt11_invoice_label": bolt11_guid_str,
-            "bolt11": bolt11_invoice["bolt11"],
-            "bolt12_invoice_label": bolt12_label,
-            "bolt12_invoice": bolt12_invoice
+            "bolt11": bolt11_invoice["bolt11"]
+            #,
+            #"bolt12_invoice_label": bolt12_label,
+            #"bolt12_invoice": bolt12_invoice
         }
 
         json_data = json.dumps(createorder_response)
