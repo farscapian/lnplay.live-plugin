@@ -6,7 +6,7 @@ import uuid
 from math import floor
 from pyln.client import Plugin, RpcError
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 lnlive_plugin_version = "v0.0.1"
 
@@ -170,10 +170,54 @@ class WhatTheHellException(Exception):
 @plugin.subscribe("invoice_payment")
 def on_payment(plugin, invoice_payment, **kwargs):
     try:
+        invoice_id = invoice_payment["label"]
+        plugin.log(f"invoice_id: {invoice_id}")
+
+        # let's get the invoice details.
+        invoices = plugin.rpc.listinvoices(invoice_id)
+
+        matching_invoice = None
+        for invoice in invoices["invoices"]:
+            if invoice.get("label") == invoice_id:
+              matching_invoice = invoice
+              break
+
+        if matching_invoice is None:
+            raise InvoiceNotFoundError("Invoice not found. Wrong invoice_id?")
+
+        deployment_details = "todo"
+
+        connection_strings = ['connection_string0', 'connection_string1', 'connection_string2']
+
+        invoice_description = matching_invoice["description"]
+        plugin.log(f"invoice_description: {invoice_description}")
+
+        # we pull the hours from the invoice description.
+        number_of_hours = 0
+        match = re.search(r'(\d+)\s+hours\.', invoice_description)
+        if match:
+            number_of_hours = int(match.group(1))
+
+        if number_of_hours == 0:
+            raise Exception("Could not extract number_of_hours from invoice description.")
+
+        plugin.log(f"hours_from_description: {number_of_hours}")
+
         expiration_date = calculate_expiration_date(number_of_hours)
         expiration_date_utc = expiration_date.strftime('%Y-%m-%d %H:%M:%S')
 
+        # order_details resonse
+        order_details = {
+            "version": lnlive_plugin_version,
+            "invoice_label": invoice_label,
+            "deployment_details": deployment_details,
             "expiration_date": expiration_date_utc,
+            "connection_strings": connection_strings
+        }
+
+        # add the order_details info to datastore with the invoice_label as the key
+        plugin.rpc.datastore(key=invoice_label, string=json.dumps(order_details), mode="must-create")
+
     except RpcError as e:
         printout("Payment error: {}".format(e))
 
