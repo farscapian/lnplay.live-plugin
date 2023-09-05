@@ -191,8 +191,12 @@ def on_payment(plugin, invoice_payment, **kwargs):
         if matching_invoice is None:
             raise InvoiceNotFoundError("Invoice not found. Wrong invoice_id?")
 
+        # let's grab the invoice description.
         invoice_description = matching_invoice["description"]
-        plugin.log(f"invoice_description: {invoice_description}")
+        if invoice_description.startswith("lnplay.live"):
+            plugin.log(f"lnplay-live: invoice is associated with lnplay.live. Starting provisioning process. invoice_id: {invoice_id}")
+        else:
+            return
 
         # we pull the hours from the invoice description.
         number_of_hours = 0
