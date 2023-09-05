@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import time
 import uuid
 from math import floor
 from pyln.client import Plugin, RpcError
@@ -27,7 +28,7 @@ def init(options, configuration, plugin, **kwargs):
 
 
 @plugin.method("lnplaylive-createorder")
-def lnplaylive_createorder(plugin, node_count, hours, order_details_json):
+def lnplaylive_createorder(plugin, node_count, hours):
     '''Returns a BOLT11 invoice for the given node count and time.'''
     try:
         # first let's ensure the values that they passed in are appropriate.
@@ -71,21 +72,21 @@ def lnplaylive_createorder(plugin, node_count, hours, order_details_json):
         bolt11_invoice = plugin.rpc.invoice(amount_to_charge, bolt11_guid_str, description, 300)
 
         # create a BOLT12 offer.
-        bolt12_label = str(uuid.uuid4())
-        bolt12_invoice = "TODO"
+        #bolt12_label = str(uuid.uuid4())
+        #bolt12_invoice = "TODO"
 
         # get calculate an estimated expiration datetime for the vm environment.
         expiration_date = calculate_expiration_date(hours)
-        date_string = expiration_date.strftime('%Y-%m-%d %H:%M:%S')
 
         createorder_response = {
             "node_count": node_count,
             "hours": hours,
-            "expires_after": date_string,
+            "expires_after": expiration_date,
             "bolt11_invoice_id": bolt11_guid_str,
-            "bolt11_invoice": bolt11_invoice["bolt11"],
-            "bolt12_invoice_id": bolt12_label,
-            "bolt12_invoice": bolt12_invoice
+            "bolt11_invoice": bolt11_invoice["bolt11"]
+            #,
+            #"bolt12_invoice_id": bolt12_label,
+            #"bolt12_invoice": bolt12_invoice
         }
 
         json_data = json.dumps(createorder_response)
@@ -122,21 +123,28 @@ def lnplaylive_invoicestatus(plugin, payment_type, invoice_id):
         invoice_status = matching_invoice["status"]
 
         deployment_details = None
-
-        connection_strings = ["constr0", "constr1", "constr2", "..."]
+        matching_record = None
 
         if invoice_status == "paid":
-            deployment_details = {
-                "lnplay_git_head": "TODO",
-                "lnlive_plugin_version": lnlive_plugin_version,
-                "connection_strings": connection_strings
-            }
+            # the deployment details I need to pull from the datastore.
+            # since the invoice is paid, we will need to consult the object in the data store.
+            deployment_details = plugin.rpc.listdatastore(invoice_id)
+
+            for record in deployment_details["datastore"]:
+                if record.get("key")[0] == invoice_id:
+                    matching_record = record
+                    break
+
+        deployment_details_json = "not_deployed"
+        if matching_record is not None:
+            deployment_details = matching_record["string"]
+            deployment_details_json = json.loads(str(deployment_details))
 
         invoicestatus_response = {
-            "payment_type": payment_type,
             "invoice_id": invoice_id,
+            "payment_type": payment_type,
             "invoice_status": invoice_status,
-            "deployment_details": deployment_details
+            "deployment_details": deployment_details_json
         }
 
         json_data = json.dumps(invoicestatus_response)
@@ -171,7 +179,7 @@ class WhatTheHellException(Exception):
 def on_payment(plugin, invoice_payment, **kwargs):
     try:
         invoice_id = invoice_payment["label"]
-        plugin.log(f"invoice_id: {invoice_id}")
+        plugin.log(f"lnplaylive invoice paid: {invoice_id}")
 
         # let's get the invoice details.
         invoices = plugin.rpc.listinvoices(invoice_id)
@@ -185,10 +193,6 @@ def on_payment(plugin, invoice_payment, **kwargs):
         if matching_invoice is None:
             raise InvoiceNotFoundError("Invoice not found. Wrong invoice_id?")
 
-        deployment_details = "todo"
-
-        connection_strings = ['connection_string0', 'connection_string1', 'connection_string2']
-
         invoice_description = matching_invoice["description"]
         plugin.log(f"invoice_description: {invoice_description}")
 
@@ -201,26 +205,28 @@ def on_payment(plugin, invoice_payment, **kwargs):
         if number_of_hours == 0:
             raise Exception("Could not extract number_of_hours from invoice description.")
 
-        plugin.log(f"hours_from_description: {number_of_hours}")
-
         expiration_date = calculate_expiration_date(number_of_hours)
-        expiration_date_utc = expiration_date.strftime('%Y-%m-%d %H:%M:%S')
 
         # order_details resonse
         order_details = {
-            "version": lnlive_plugin_version,
-            "invoice_label": invoice_label,
-            "deployment_details": deployment_details,
-            "expiration_date": expiration_date_utc,
-            "connection_strings": connection_strings
+            "lnlive_plugin_version": lnlive_plugin_version,
+            "vm_expiration_date": expiration_date,
+            "status": "starting_deployment"
+            
         }
 
         # add the order_details info to datastore with the invoice_label as the key
-        plugin.rpc.datastore(key=invoice_label, string=json.dumps(order_details), mode="must-create")
+        plugin.rpc.datastore(key=invoice_id, string=json.dumps(order_details),mode="create-or-replace")
+
+        # This is where we can start integregrating sovereign stack, calling sovereign stack scripts
+        # to bring up a new VM on a remote LXD endpoint. Basically we bring it up,
+
+        #connection_strings = ['connection_string0', 'connection_string1', 'connection_string2']
+        # TODO add connection strings to object and update the record.
+
 
     except RpcError as e:
         printout("Payment error: {}".format(e))
-
 
 def calculate_expiration_date(hours):
 
@@ -228,7 +234,7 @@ def calculate_expiration_date(hours):
     current_datetime = datetime.now()
     time_delta = timedelta(hours=hours)
     expired_after_datetime = current_datetime + time_delta
-
-    return expired_after_datetime
+    expiration_date_utc = expired_after_datetime.strftime('%Y-%m-%dT%H:%M:%SZ')
+    return expiration_date_utc
 
 plugin.run()  # Run our plugin
