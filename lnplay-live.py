@@ -4,9 +4,8 @@ import os
 import re
 import time
 import uuid
-from math import floor
+from math
 from pyln.client import Plugin, RpcError
-import uuid
 from datetime import datetime, timedelta
 
 lnlive_plugin_version = "v0.0.1"
@@ -142,6 +141,7 @@ def lnplaylive_invoicestatus(plugin, payment_type, invoice_id):
 
         invoicestatus_response = {
             "invoice_id": invoice_id,
+            "hours": 
             "payment_type": payment_type,
             "invoice_status": invoice_status,
             "deployment_details": deployment_details_json
