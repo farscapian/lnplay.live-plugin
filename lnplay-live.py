@@ -216,7 +216,7 @@ def on_payment(plugin, invoice_payment, **kwargs):
         }
 
         # add the order_details info to datastore with the invoice_label as the key
-        plugin.rpc.datastore(key=invoice_id, string=json.dumps(order_details),mode="create-or-replace")
+        plugin.rpc.datastore(key=invoice_id, string=json.dumps(order_details),mode="must-create")
 
         # This is where we can start integregrating sovereign stack, calling sovereign stack scripts
         # to bring up a new VM on a remote LXD endpoint. Basically we bring it up,
