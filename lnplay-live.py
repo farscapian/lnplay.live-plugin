@@ -4,7 +4,6 @@ import os
 import re
 import time
 import uuid
-from math
 from pyln.client import Plugin, RpcError
 from datetime import datetime, timedelta
 
@@ -141,7 +140,7 @@ def lnplaylive_invoicestatus(plugin, payment_type, invoice_id):
 
         invoicestatus_response = {
             "invoice_id": invoice_id,
-            "hours": 
+            "hours": "TODO",
             "payment_type": payment_type,
             "invoice_status": invoice_status,
             "deployment_details": deployment_details_json
@@ -179,7 +178,6 @@ class WhatTheHellException(Exception):
 def on_payment(plugin, invoice_payment, **kwargs):
     try:
         invoice_id = invoice_payment["label"]
-        plugin.log(f"lnplaylive invoice paid: {invoice_id}")
 
         # let's get the invoice details.
         invoices = plugin.rpc.listinvoices(invoice_id)
