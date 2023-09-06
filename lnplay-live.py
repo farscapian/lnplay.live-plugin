@@ -76,17 +76,27 @@ def lnplaylive_createorder(plugin, node_count, hours):
         # get calculate an estimated expiration datetime for the vm environment.
         expiration_date = calculate_expiration_date(hours)
 
+        # build an object to send back to the caller.
         createorder_response = {
             "node_count": node_count,
             "hours": hours,
             "expires_after": expiration_date,
             "bolt11_invoice_id": bolt11_guid_str,
             "bolt11_invoice": bolt11_invoice["bolt11"]
-            #,
-            #"bolt12_invoice_id": bolt12_label,
-            #"bolt12_invoice": bolt12_invoice
         }
 
+        # everything in this object gets stored in the database and gets built upon by later scripts.
+        createorder_dbdetails = {
+            "node_count": node_count,
+            "hours": hours
+        }
+
+        # let's store the order details in the datastore under the bolt11_guid_str
+        # later execution logic can use this data in downstream calculations, and it's inconvenient 
+        # to embed the order details in the actual invoice.
+        plugin.rpc.datastore(key=bolt11_guid_str, string=json.dumps(createorder_dbdetails),mode="must-create")
+
+        # now return the order details to the caller.
         json_data = json.dumps(createorder_response)
         json_dict = json.loads(json_data)
         return json_dict
@@ -138,9 +148,28 @@ def lnplaylive_invoicestatus(plugin, payment_type, invoice_id):
             deployment_details = matching_record["string"]
             deployment_details_json = json.loads(str(deployment_details))
 
+        dbdetails_records = plugin.rpc.listdatastore(invoice_id)
+        dbdetails = None
+        for record in dbdetails_records["datastore"]:
+            if record.get("key")[0] == invoice_id:
+                dbdetails = record
+                break
+
+        node_count = None
+        hours = None
+        dbdetails_json = None
+        if dbdetails is not None:
+            dbdetails = dbdetails["string"]
+            dbdetails_json = json.loads(str(dbdetails))
+
+            if dbdetails_json is not None:
+                node_count = dbdetails_json["node_count"]
+                hours = dbdetails_json["hours"]
+
         invoicestatus_response = {
             "invoice_id": invoice_id,
-            "hours": "TODO",
+            "node_count": node_count,
+            "hours": hours,
             "payment_type": payment_type,
             "invoice_status": invoice_status,
             "deployment_details": deployment_details_json
@@ -214,11 +243,10 @@ def on_payment(plugin, invoice_payment, **kwargs):
             "lnlive_plugin_version": lnlive_plugin_version,
             "vm_expiration_date": expiration_date,
             "status": "starting_deployment"
-            
         }
 
         # add the order_details info to datastore with the invoice_label as the key
-        plugin.rpc.datastore(key=invoice_id, string=json.dumps(order_details),mode="must-create")
+        plugin.rpc.datastore(key=invoice_id, string=json.dumps(order_details),mode="must-replace")
 
         # This is where we can start integregrating sovereign stack, calling sovereign stack scripts
         # to bring up a new VM on a remote LXD endpoint. Basically we bring it up,
