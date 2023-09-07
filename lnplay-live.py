@@ -227,19 +227,40 @@ def on_payment(plugin, invoice_payment, **kwargs):
         else:
             return
 
-        # we pull the hours from the invoice description.
-        number_of_hours = 0
-        match = re.search(r'(\d+)\s+hours\.', invoice_description)
-        if match:
-            number_of_hours = int(match.group(1))
+        # we pull the order details from the database. We'll be replacing that record here soonish.
+        order_details_records = plugin.rpc.listdatastore(invoice_id)
+        order_details = None
+        for record in order_details_records["datastore"]:
+            if record.get("key")[0] == invoice_id:
+                order_details = record
+                break
 
-        if number_of_hours == 0:
+            if order_details is None:
+                raise Exception("Could not locate the order details.")
+
+        node_count = 0
+        hours = 0
+        if order_details is not None:
+            dbdetails = order_details["string"]
+            dbdetails_json = json.loads(str(dbdetails))
+
+            if dbdetails_json is not None:
+                node_count = dbdetails_json["node_count"]
+                hours = dbdetails_json["hours"]
+
+        if hours == 0:
             raise Exception("Could not extract number_of_hours from invoice description.")
 
-        expiration_date = calculate_expiration_date(number_of_hours)
+
+        if node_count == 0:
+            raise Exception("Could not extract node_count from invoice description.")
+
+        expiration_date = calculate_expiration_date(hours)
 
         # order_details resonse
         order_details = {
+            "node_count": node_count,
+            "hours": hours,
             "lnlive_plugin_version": lnlive_plugin_version,
             "vm_expiration_date": expiration_date,
             "status": "starting_deployment"
@@ -254,6 +275,9 @@ def on_payment(plugin, invoice_payment, **kwargs):
         #connection_strings = ['connection_string0', 'connection_string1', 'connection_string2']
         # TODO add connection strings to object and update the record.
 
+
+        # todo ; install ssh client, lxd client, sovereign stack.
+        
 
     except RpcError as e:
         printout("Payment error: {}".format(e))
