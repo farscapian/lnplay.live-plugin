@@ -274,10 +274,12 @@ def on_payment(plugin, invoice_payment, **kwargs):
         # Log that we are starting the provisoining proces.s
         plugin.log(f"lnplay-live: invoice is associated with lnplay.live. Starting provisioning process. invoice_id: {invoice_id}")
 
+        lxd_remote_endpoint = os.environ.get('LNPLAY_LXD_FQDN_PORT')
+        lxd_remote_password = os.environ.get('LNPLAY_LXD_PASSWORD')
+
         # The path to the Bash script
-        provsion_script_path = '/dev-plugins/lnplaylive/provision_lxd.sh'
-        # Call the Bash script
-        subprocess.run([provsion_script_path])
+        script_path = '/dev-plugins/add_lxd_remote.sh'
+
 
     except RpcError as e:
         printout("Payment error: {}".format(e))
