@@ -3,6 +3,7 @@ import json
 import os
 import re
 import time
+import subprocess
 import uuid
 from pyln.client import Plugin, RpcError
 from datetime import datetime, timedelta
@@ -222,9 +223,7 @@ def on_payment(plugin, invoice_payment, **kwargs):
 
         # let's grab the invoice description.
         invoice_description = matching_invoice["description"]
-        if invoice_description.startswith("lnplay.live"):
-            plugin.log(f"lnplay-live: invoice is associated with lnplay.live. Starting provisioning process. invoice_id: {invoice_id}")
-        else:
+        if not invoice_description.startswith("lnplay.live"):
             return
 
         # we pull the order details from the database. We'll be replacing that record here soonish.
@@ -272,12 +271,15 @@ def on_payment(plugin, invoice_payment, **kwargs):
         # This is where we can start integregrating sovereign stack, calling sovereign stack scripts
         # to bring up a new VM on a remote LXD endpoint. Basically we bring it up,
 
-        #connection_strings = ['connection_string0', 'connection_string1', 'connection_string2']
-        # TODO add connection strings to object and update the record.
+        # Log that we are starting the provisoining proces.s
+        plugin.log(f"lnplay-live: invoice is associated with lnplay.live. Starting provisioning process. invoice_id: {invoice_id}")
 
+        lxd_remote_endpoint = os.environ.get('LNPLAY_LXD_FQDN_PORT')
+        lxd_remote_password = os.environ.get('LNPLAY_LXD_PASSWORD')
 
-        # todo ; install ssh client, lxd client, sovereign stack.
-        
+        # The path to the Bash script
+        script_path = '/dev-plugins/add_lxd_remote.sh'
+
 
     except RpcError as e:
         printout("Payment error: {}".format(e))
